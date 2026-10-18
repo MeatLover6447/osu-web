@@ -1,0 +1,22 @@
+# Cache policy for the static osu!web bundle.
+#
+# The _framework/ directory and the root *.js modules are content-hashed by the .NET SDK
+# (dotnet.541iytygra.js, main.stcnpjv9oc.js, ...), so a given URL always refers to the same
+# bytes and is safe to cache forever. Without this the browser re-downloads ~130 MB of
+# WebAssembly on every page reload.
+#
+# Everything else uses `no-cache`, which still permits caching -- the browser merely has to
+# revalidate first. Static hosts answer that with a cheap 304 Not Modified rather than
+# re-sending the body, so reloading stays fast while a re-uploaded build is still picked up
+# immediately.
+#
+# GitHub Pages ignores this file and applies its own 10-minute default instead.
+
+/*
+  Cache-Control: no-cache
+
+/_framework/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.js
+  Cache-Control: public, max-age=31536000, immutable

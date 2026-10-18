@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>osu!web</title>
+  <!-- Inline so the browser never asks for /favicon.ico (which would be a 404 on any
+       static host). An SVG circle in osu!'s pink costs no request and no file. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%23ff66aa'/%3E%3Ccircle cx='50' cy='50' r='26' fill='none' stroke='%23ffffff' stroke-width='7'/%3E%3C/svg%3E">
+  <link href="_framework/dotnet.541iytygra.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-2xPA0xnqevbzG7l2twJPqwCBYK/3C1vP9MQyPNmlOP4=" />
+  <link rel="stylesheet" href="shell.css" />
+  <script type="importmap">{
+  "imports": {
+    "./_framework/dotnet.js": "./_framework/dotnet.541iytygra.js",
+    "./_framework/dotnet.native.js": "./_framework/dotnet.native.tllim3b3yl.js",
+    "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.azrfhwb804.js",
+    "./main.js": "./main.stcnpjv9oc.js",
+    "./osuAudio.js": "./osuAudio.rw0djl3yks.js",
+    "./osuGL.js": "./osuGL.4ehm4urlq8.js",
+    "./shell.js": "./shell.8udy8gasxw.js"
+  },
+  "scopes": {},
+  "integrity": {
+    "./_framework/dotnet.541iytygra.js": "sha256-2xPA0xnqevbzG7l2twJPqwCBYK/3C1vP9MQyPNmlOP4=",
+    "./_framework/dotnet.js": "sha256-2xPA0xnqevbzG7l2twJPqwCBYK/3C1vP9MQyPNmlOP4=",
+    "./_framework/dotnet.native.js": "sha256-H5AIX1BCgny8d8HDC8DQO415WAHun8udKf4LRFWAcIk=",
+    "./_framework/dotnet.native.tllim3b3yl.js": "sha256-H5AIX1BCgny8d8HDC8DQO415WAHun8udKf4LRFWAcIk=",
+    "./_framework/dotnet.runtime.azrfhwb804.js": "sha256-muN076HgyOCoAaid7zD7a2/GN7aQ7tmK/BzdnKgw78g=",
+    "./_framework/dotnet.runtime.js": "sha256-muN076HgyOCoAaid7zD7a2/GN7aQ7tmK/BzdnKgw78g=",
+    "./main.js": "sha256-sLW2yiiVGUgqIApQHneVkjqXlFkNzjhZhqcm93G+YYk=",
+    "./main.stcnpjv9oc.js": "sha256-sLW2yiiVGUgqIApQHneVkjqXlFkNzjhZhqcm93G+YYk=",
+    "./osuAudio.js": "sha256-JaNa9SSDn4nUMFM7zgHMPap7DxUaRTuWK8KOlVhl+pg=",
+    "./osuAudio.rw0djl3yks.js": "sha256-JaNa9SSDn4nUMFM7zgHMPap7DxUaRTuWK8KOlVhl+pg=",
+    "./osuGL.4ehm4urlq8.js": "sha256-jK1hUTpBE/dm/+VifFZ7454Xt2iovtqtYgPdVQ4xNLQ=",
+    "./osuGL.js": "sha256-jK1hUTpBE/dm/+VifFZ7454Xt2iovtqtYgPdVQ4xNLQ=",
+    "./shell.8udy8gasxw.js": "sha256-kGLmaA7ztPtnFl4aABp/XEjEtYLWsIwXYN0KKJzuFis=",
+    "./shell.js": "sha256-kGLmaA7ztPtnFl4aABp/XEjEtYLWsIwXYN0KKJzuFis="
+  }
+}</script>
+  <!-- The mono runtime boots by firing a burst of fetch() calls for ~1000 wasm/js assets. Every
+       response carries an SRI digest, so a single 5xx from a proxy or a dropped connection can
+       never satisfy it — one flaky request means the boot aborts and the page sits on "starting
+       .NET runtime…" forever. Retrying server errors costs nothing on the success path (only
+       failures pay) and lets a cold boot survive an unreliable network. Requests carrying a body
+       are passed through untouched, since such a body may not be replayable. -->
+  <script>
+    (() => {
+      const realFetch = window.fetch.bind(window);
+
+      // Files over GitHub's 100 MB-per-file limit ship as ordered fragments — <name>.p0.wasm,
+      // <name>.p1.wasm, … — with the original name absent, and are stitched back together below so
+      // the runtime receives exactly the bytes it asked for. Only _framework/osu.Game.Resources
+      // needs this (~127 MB), and only because of that limit; nothing else about the build changes.
+      //
+      // Reassembly is byte-for-byte identical to the unsplit file. The runtime's SRI digest covers
+      // the whole file rather than a fragment, so it cannot be applied to the individual requests
+      // and is dropped here; the assembled total is checked against the expected byte count
+      // instead, which catches truncation — the failure mode that actually occurs in practice.
+      //
+      // Both tables are rewritten by web/make-static-export.ps1. The name carries a content hash,
+      // so they must be regenerated on every rebuild rather than edited by hand.
+      const SPLIT_FILES = {"osu.Game.Resources.pikmlvzzc4.wasm":["osu.Game.Resources.pikmlvzzc4.p0.wasm","osu.Game.Resources.pikmlvzzc4.p1.wasm"]};
+      const SPLIT_LENGTHS = {"osu.Game.Resources.pikmlvzzc4.wasm":132945177};
+
+      // Two separate problems, one wrapper.
+      //
+      // 1. Concurrency. The runtime opens a fetch for every asset at once — ~1000 requests,
+      //    ~130 MB — and that burst reliably gets 502s back rather than streaming through.
+      //    Capping how many are in flight turns it into a steady trickle the server can serve.
+      // 2. Retries. The runtime passes `integrity` on these fetches, so a 502 (empty body)
+      //    makes the fetch *reject* on a digest mismatch instead of returning a 502 response —
+      //    and one bad asset aborts the entire boot. Retrying recovers; only failures pay.
+      const MAX_IN_FLIGHT = 6;
+      let inFlight = 0;
+      const waiters = [];
+
+      const acquire = () => inFlight < MAX_IN_FLIGHT
+        ? (inFlight++, Promise.resolve())
+        : new Promise(r => waiters.push(r));
+
+      const release = () => {
+        const next = waiters.shift();
+        if (next) next();
+        else inFlight--;
+      };
+
+      // Retries on 5xx (and only on failures — the success path pays nothing), so a burst of
+      // ~1000 asset requests survives a proxy that folds under it. `input` is passed through
+      // untouched for ordinary requests so anything carried on a Request — integrity included —
+      // still reaches the network.
+      const fetchWithRetry = async (input, init, url) => {
+        let lastError;
+        for (let attempt = 0; attempt < 8; attempt++) {
+          if (attempt) await new Promise(r => setTimeout(r, Math.min(1500, 200 * attempt)));
+          await acquire();
+          try {
+            const response = await realFetch(input, init);
+            if (response.status < 500) return response;
+            lastError = new Error(`HTTP ${response.status} for ${url}`);
+          } catch (e) {
+            lastError = e;
+          } finally {
+            release();
+          }
+        }
+        throw lastError;
+      };
+
+      // Stitches one oversized file's fragments back into a single Response.
+      //
+      // Every fragment is requested and status-checked first — with the retries above — so a
+      // missing or failing fragment surfaces as an ordinary HTTP error the runtime can see, before
+      // a single byte is handed over. The bodies are then read one at a time, so only one fragment
+      // is resident at once rather than all of them plus a concatenated copy: at ~63 MB per
+      // fragment that is the difference between ~126 MB and ~250 MB of peak JS memory.
+      const reassemble = async (url, init) => {
+        const dir = url.slice(0, url.lastIndexOf('/') + 1);
+        const name = url.slice(dir.length);
+        const fragments = SPLIT_FILES[name];
+        const expected = SPLIT_LENGTHS[name];
+
+        const fragmentInit = init ? { ...init } : { method: 'GET' };
+        delete fragmentInit.integrity;
+
+        const responses = [];
+        for (const fragment of fragments) {
+          const fragmentUrl = dir + fragment;
+          const response = await fetchWithRetry(fragmentUrl, fragmentInit, fragmentUrl);
+          if (!response.ok)
+            throw new Error(`HTTP ${response.status} for ${fragmentUrl}`);
+          responses.push(response);
+        }
+
+        let seen = 0;
+        const body = new ReadableStream({
+          async start(controller) {
+            try {
+              for (const response of responses) {
+                const reader = response.body.getReader();
+                for (;;) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  seen += value.byteLength;
+                  controller.enqueue(value);
+                }
+              }
+              if (expected != null && seen !== expected)
+                throw new Error(`assembled ${seen} bytes for ${name}, expected ${expected}`);
+              controller.close();
+            } catch (e) {
+              controller.error(e);
+            }
+          },
+        });
+
+        return new Response(body, {
+          status: 200,
+          headers: { 'Content-Type': 'application/wasm' },
+        });
+      };
+
+      window.fetch = async (input, init) => {
+        const url = String(input && input.url ? input.url : input);
+        const hasBody = init && init.body != null;
+
+        if (!hasBody && SPLIT_FILES[url.slice(url.lastIndexOf('/') + 1)])
+          return reassemble(url, init);
+
+        const throttled = url.includes('/_framework/') && !hasBody;
+        if (!throttled) return realFetch(input, init);
+
+        return fetchWithRetry(input, init, url);
+      };
+    })();
+  </script>
+  <script type='module' src="main.stcnpjv9oc.js"></script>
+</head>
+<body>
+  <canvas id="game" tabindex="0"></canvas>
+  <div id="status">booting…</div>
+
+  <!-- The gameplay host draws the playfield here; the shell sits over the top of it and hides
+       itself when a play is running (see shell.js). -->
+
+  <!-- Covers the gap between clicking Play and gameplay actually running. A cold load is long
+       enough to read as a hang, so this reports real milestones (see shell.js) and shimmers
+       in between rather than sitting frozen. Sits outside #shell so it can appear while the
+       shell is hidden during gameplay (and again, briefly, on a restart). -->
+  <div id="load-overlay" hidden>
+    <div class="load-box">
+      <div id="load-label">starting…</div>
+      <div class="load-track"><div class="load-fill" id="load-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- "back to difficulties" for when lazer's own ResultsScreen is what's on the canvas. It has
+       to live outside #shell, because re-showing the shell would cover the very screen it
+       is meant to leave. -->
+  <button id="game-back" hidden>← back to difficulties</button>
+
+  <!-- The shell's own menu screen: a lazer-style song-select laid out over the beatmap's real
+       background artwork (dimmed and blurred, like the gameplay background container does in
+       canvas). Left panel shows the selected difficulty's details, the middle column is the
+       scrollable list, the right column is the mod picker, and the top bar carries import,
+       settings and Play. Drives the real gameplay host through window.osu (see shell.js). -->
+  <div id="shell">
+    <!-- Beatmap artwork behind everything. The <img> is only a loader: the actual backdrop is a
+         CSS background on #shell-bg so dim/blur/position can be driven by CSS custom
+         properties without repainting the element itself. -->
+    <div id="shell-bg"></div>
+
+    <header id="topbar">
+      <div class="topbar-left">
+        <span id="shell-title" class="title">osu!web</span>
+        <label class="import">
+          <input type="file" id="osz-file" accept=".osz,.zip" />
+          <span>import .osz</span>
+        </label>
+        <span id="import-status" class="muted">choose a .osz to begin</span>
+      </div>
+
+      <div class="topbar-right">
+        <button id="settings-button" type="button" title="settings">settings</button>
+        <button id="play-button" class="play" disabled>play</button>
+      </div>
+    </header>
+
+    <div id="layout">
+      <!-- Selected difficulty's details, mirroring lazer's own info panel: title/artist/mapper,
+           the star rating the real difficulty calculator reports for the current mod selection,
+           the object breakdown, and the four difficulty settings osu! shows. -->
+      <aside id="info" hidden>
+        <div id="beatmap-info" class="beatmap-info"></div>
+      </aside>
+
+      <!-- Every difficulty in the set in one column, easiest first, each coloured by its own star
+           rating — lazer's carousel when it is sorted by difficulty rather than grouped by band. -->
+      <main id="list-pane">
+        <div id="difficulty-list" class="difficulties" hidden></div>
+        <div id="empty-note" class="empty">import a .osz to see its difficulties here</div>
+      </main>
+
+      <!-- The ruleset's own mod list, fetched from OsuRuleset.CreateAllMods() rather than copied
+           out of it, so anything lazer gains or loses shows up here without a shell change.
+           One column per ModType, laid out left to right and coloured the way lazer's mod select
+           categorises them, each column scrolling its own mods; and each mod writes out its full
+           name, description, score multiplier and ranked status, with any setting it exposes
+           (DT's speed, flashlight's size, …) editable in place. -->
+      <aside id="mods-pane">
+        <div class="pane-heading">mods</div>
+        <div id="mod-columns" class="columns"></div>
+
+        <!-- What the current selection does to the map: the total score multiplier and whether the
+             set still scores pp, then the resulting difficulty — the same numbers lazer's mod
+             select previews before you commit to a play. -->
+        <div id="mod-footer" class="mod-footer" hidden>
+          <div class="mod-footer-line">
+            <span id="mod-multiplier" class="mod-multiplier">1.00x</span>
+            <span id="mod-ranked" class="mod-ranked ranked">ranked</span>
+          </div>
+          <div id="mod-preview" class="mod-preview"></div>
+        </div>
+
+        <div id="mod-note" class="muted"></div>
+      </aside>
+    </div>
+
+    <!-- Shown in place of the difficulty list once a play has ended without reaching lazer's own
+         results screen (a fail, or quitting out early). -->
+    <div id="results" class="results" hidden></div>
+  </div>
+
+  <!-- Settings. Every control below writes to a real OsuConfigManager bindable (or, for the skin,
+       to SkinManager.CurrentSkinInfo), so what is set here is what lazer's gameplay code reads.
+       Grouped the way lazer's own settings overlay sections are: visual, audio, input, graphics. -->
+  <div id="settings" hidden>
+    <div class="settings-box">
+      <div class="settings-heading">
+        <span>settings</span>
+        <button id="settings-close" type="button" title="close">×</button>
+      </div>
+
+      <div id="gameplay-settings"></div>
+
+      <section class="settings-section">
+        <div class="pane-heading">skin</div>
+        <div class="row">
+          <span id="skin-name" class="muted">—</span>
+          <label class="import">
+            <input type="file" id="osk-file" accept=".osk" />
+            <span>import .osk</span>
+          </label>
+          <span id="skin-status" class="muted"></span>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="opt-volume" checked /> audio</label>
+          <span id="settings-status" class="muted"></span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="shell.8udy8gasxw.js"></script>
+</body>
+</html>
