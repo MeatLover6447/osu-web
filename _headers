@@ -27,3 +27,9 @@
 
 /*.css
   Cache-Control: public, max-age=31536000, immutable
+
+# The unhashed alias, revalidated every load. It exists only so a browser still holding the
+# previous index.html can resolve the stylesheet it names; later rules win, so this has to
+# come after the fingerprinted rule above.
+/shell.css
+  Cache-Control: no-cache
