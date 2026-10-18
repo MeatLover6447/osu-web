@@ -52,16 +52,83 @@ html, body {
     cursor: none;
 }
 
-#status {
+/* Boot screen: shown from first paint until the game reports running, then removed by
+   main.js. Deliberately covers the whole viewport — during a cold load the canvas is still
+   black, and a status line in the corner reads as "nothing is happening". */
+#boot {
     position: fixed;
-    left: 8px;
-    bottom: 6px;
-    z-index: 30;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    background: #08080e;
+}
+
+#boot[hidden] {
+    display: none;
+}
+
+.boot-mark {
+    color: #fff;
+    font: 600 34px/1 'Segoe UI', system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    opacity: 0.92;
+}
+
+.boot-box {
+    width: min(380px, 74vw);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#status {
     color: #8ab4ff;
-    font: 12px/1.4 monospace;
-    pointer-events: none;
-    text-shadow: 0 1px 2px #000;
+    font: 12px/1.4 'Segoe UI', system-ui, sans-serif;
+    text-align: center;
+    min-height: 1.4em;
     white-space: pre;
+}
+
+/* Live download detail: bytes, file counts, elapsed. Updated by main.js while the runtime and
+   its assemblies are being fetched — the phase that can take minutes on a slow link. */
+#boot-detail {
+    color: #7a7a90;
+    font: 11px/1.5 'Segoe UI', system-ui, sans-serif;
+    text-align: center;
+    min-height: 1.5em;
+    font-variant-numeric: tabular-nums;
+    white-space: pre;
+}
+
+.boot-track {
+    position: relative;
+    height: 6px;
+    border-radius: 999px;
+    background: #222230;
+    overflow: hidden;
+}
+
+.boot-track::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+    transform: translateX(-100%);
+    animation: load-shimmer 1.1s linear infinite;
+}
+
+#boot-fill {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ff66aa, #ff9ac6);
+    transition: width 320ms ease;
 }
 
 /* --- backdrop ------------------------------------------------------------------------ */

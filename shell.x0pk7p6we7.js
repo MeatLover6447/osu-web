@@ -263,17 +263,38 @@
         }
     }
 
-    // Applies stored values over whatever the game booted with. Anything the user never touched
-    // keeps the game's own default, so settings added later inherit lazer's defaults.
+    // Resolves the value every control should start with, and pushes it to the game.
+    //
+    // A value the user has touched before (localStorage) wins; otherwise the game's own current
+    // value is used, which on a first visit is lazer's default. Every control is resolved and
+    // pushed — not only the stored ones.
+    //
+    // The old version skipped anything not in storage, so on a first visit nothing was applied at
+    // all: the sliders sat on the HTML default with an empty readout, the game was never told a
+    // thing, and each setting only started working once the user touched that control. saveSettings
+    // then wrote those untouched HTML defaults out as if they had been chosen.
     function applySettings() {
         const stored = loadStoredSettings();
 
+        // The game's own values, as lazer currently sees them. May be unavailable before boot, in
+        // which case the stored values still apply and the game is told again once it is ready.
+        let live = {};
+        if (window.osu?.getSettings) {
+            try { live = JSON.parse(window.osu.getSettings()) || {}; } catch { live = {}; }
+        }
+
         for (const setting of SETTINGS) {
-            if (!(setting.key in stored)) continue;
-            setControl(setting.key, stored[setting.key]);
-            // Push what the control ended up holding rather than the raw stored value: setControl
-            // may have corrected an unrecognised one (see its select branch), and the two must
-            // agree or the UI would claim a limiter the pump is not applying.
+            // Host settings (the frame limiter) never come back from the game — they are the
+            // shell's own business — so they fall through to whatever the control already holds.
+            const resolved = setting.key in stored ? stored[setting.key]
+                : setting.key in live ? live[setting.key]
+                    : controlValue(setting.key);
+
+            setControl(setting.key, resolved);
+
+            // Push what the control ended up holding rather than the raw value: setControl may
+            // have corrected an unrecognised one (see its select branch), and the two must agree
+            // or the UI would claim a limiter the pump is not applying.
             pushSetting(setting.key, controlValue(setting.key));
         }
 

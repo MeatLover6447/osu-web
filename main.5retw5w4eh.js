@@ -20,10 +20,97 @@ import * as osuAudio from './osuAudio.js';
 const canvas = document.getElementById('game');
 const statusEl = document.getElementById('status');
 
+// Boot milestones, in the order main.js reports them, mapped onto how far along the loading bar
+// should read. Matching on the message text keeps every existing call site unchanged; an
+// unmatched message (an error, say) simply leaves the bar where it was.
+//
+// The first phase — fetching the runtime and its assemblies — owns everything below
+// BOOT_DOWNLOAD_END and is driven by real bytes rather than by a milestone (see pumpBootDownload),
+// because on a slow link it dwarfs every other phase put together.
+const BOOT_DOWNLOAD_END = 90;
+
+const BOOT_MILESTONES = [
+    ['binding exports', 93, 'linking JavaScript bindings'],
+    ['shaders.json', 96, 'loading precompiled shaders'],
+    ['starting game', 98, 'starting the game host'],
+    ['running', 100, ''],
+];
+
+const bootEl = document.getElementById('boot');
+const bootFillEl = document.getElementById('boot-fill');
+const bootDetailEl = document.getElementById('boot-detail');
+
+let bootDownloadPhase = true;
+
+function setBootBar(pct) {
+    if (bootFillEl) bootFillEl.style.width = `${Math.max(0, Math.min(100, pct)).toFixed(1)}%`;
+}
+
+function setBootDetail(text) {
+    if (bootDetailEl) bootDetailEl.textContent = text ?? '';
+}
+
 function setStatus(message, isError = false) {
     statusEl.textContent = message;
     statusEl.style.color = isError ? '#ff7a7a' : '#8ab4ff';
     if (isError) console.error('[osu!web]', message);
+
+    for (const [needle, pct, detail] of BOOT_MILESTONES) {
+        if (message.includes(needle)) {
+            bootDownloadPhase = false;
+            setBootBar(pct);
+            setBootDetail(detail);
+            break;
+        }
+    }
+
+    // 'running' is the last milestone: the game is interactive from here, so the boot screen goes.
+    if (message === 'running') {
+        setBootBar(100);
+        bootEl.hidden = true;
+    }
+}
+
+const formatMb = (bytes) => `${(bytes / 1048576).toFixed(1)} MB`;
+
+// Drives the loading bar while `dotnet.create()` pulls the runtime and every assembly it needs.
+//
+// Every one of those requests passes through the fetch shim in index.html, which reports bytes,
+// file counts and failures on window.__boot — the only place that can see real progress, since
+// main.js is parked inside a single await for the whole phase. Without it, the longest phase of
+// the entire boot is one fixed label and minutes of apparent nothing.
+function pumpBootDownload(startedAt) {
+    const tick = () => {
+        if (!bootDownloadPhase) return;
+
+        const b = window.__boot;
+        if (!b) { setTimeout(tick, 250); return; }
+
+        const elapsed = (performance.now() - startedAt) / 1000;
+
+        // "of X MB" only when the denominator is known: a dev build built by a plain
+        // `dotnet publish` has no shipped total to compare against, so it reports what has
+        // arrived and nothing more.
+        const size = b.total > 0
+            ? `${formatMb(b.bytes)} of ${formatMb(b.total)}`
+            : `${formatMb(b.bytes)} downloaded`;
+
+        const parts = [size, `${b.files} files`, `${elapsed.toFixed(0)}s`];
+        if (b.inflight > 0) parts.push(`${b.inflight} in flight`);
+        if (b.failed > 0) parts.push(`${b.failed} retried`);
+
+        setBootDetail(parts.join('  ·  '));
+
+        // A known denominator gives an honest percentage. A plain `dotnet publish` leaves the
+        // placeholder at 0, meaning "unknown" — in that case leave the bar alone rather than
+        // print a percentage that cannot be backed up; the shimmer and the byte counter still
+        // show that bytes are arriving.
+        if (b.total > 0) setBootBar((Math.min(b.bytes, b.total) / b.total) * BOOT_DOWNLOAD_END);
+
+        setTimeout(tick, 250);
+    };
+
+    tick();
 }
 
 /** Locates an exported type object by one of its method names, regardless of namespace layout. */
@@ -89,15 +176,51 @@ function wireInput(pump) {
     }, { passive: false });
 
     // --- keyboard (window-level so input works without canvas focus) ---
+    //
+    // The framework only emits a key transition when state *changes*, so a keyup that never
+    // arrives leaves that key logically held down forever and every later press for it is a
+    // silent no-op — which is why Escape and Backtick stop working intermittently. Two things
+    // lose keyups here:
+    //
+    //   - the browser does not deliver them while the tab is hidden or the window is blurred
+    //     (alt-tab mid-key). SDL handles exactly this by synthesising releases on focus loss;
+    //     the browser host had nothing equivalent.
+    //   - isTyping() gates keydown and keyup alike, so if focus lands on a text field between a
+    //     press and its release, the release is dropped even though the press already went out.
+    //
+    // So track what we pressed ourselves, always forward the release for anything we pressed
+    // (even once isTyping() has become true), and synthesise releases for everything still down
+    // the moment focus goes away.
+    const heldKeys = new Set();
+
+    const releaseKey = (code) => {
+        if (!heldKeys.delete(code)) return;
+        pump.KeyboardKey(code, false);
+    };
+
+    const releaseAllKeys = () => {
+        for (const code of [...heldKeys]) releaseKey(code);
+    };
+
     window.addEventListener('keydown', (e) => {
         if (isTyping()) return;
         if (e.code === 'Space' || e.code === 'Tab' || e.code.startsWith('Arrow')) e.preventDefault();
+        // Key auto-repeat re-fires keydown with the key already down; the framework would treat
+        // it as a no-op anyway, and hold-to-activate bindings read the held state, not repeats.
+        if (heldKeys.has(e.code)) return;
+        heldKeys.add(e.code);
         pump.KeyboardKey(e.code, true);
     });
 
     window.addEventListener('keyup', (e) => {
-        if (isTyping()) return;
-        pump.KeyboardKey(e.code, false);
+        // Deliberately not gated on isTyping(): a release for a key we pressed must always get
+        // through, or that key is stuck down.
+        releaseKey(e.code);
+    });
+
+    window.addEventListener('blur', releaseAllKeys);
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) releaseAllKeys();
     });
 
     // --- touch ---
@@ -141,6 +264,11 @@ function wireWindow(pump) {
 
 async function boot() {
     setStatus('starting .NET runtime…');
+
+    // Start reporting download bytes before parking on the await below: everything after this
+    // point for the next however-many-seconds happens inside dotnet.create().
+    pumpBootDownload(performance.now());
+
     const host = await dotnet.create();
     const { setModuleImports, getAssemblyExports, getConfig, runMain } = host;
 
@@ -327,18 +455,46 @@ async function boot() {
         const samples = [];
         let previous = 0;
 
+        // A handful of startup samples is not enough. rAF fires as fast as the compositor is
+        // willing to run it, which during load (or while the tab is not the focused one) is
+        // often well above the panel's real rate: this measured 238 Hz on a 60 Hz display, and
+        // silently armed the 2x/4x/8x limiters at multiples of a rate the panel never had.
+        //
+        // So ignore samples taken while the document is not visible, take enough of them to
+        // survive a couple of outliers, and snap the median to a rate a monitor actually runs at.
+        const KNOWN_RATES = [30, 48, 50, 60, 72, 75, 90, 100, 120, 144, 165, 180, 240, 360];
+        const SAMPLES_NEEDED = 32;
+
         const sample = (now) => {
+            if (document.hidden) {
+                // Not visible: restart the pairing rather than record one enormous gap.
+                previous = 0;
+                requestAnimationFrame(sample);
+                return;
+            }
+
             if (previous > 0) samples.push(now - previous);
             previous = now;
 
-            if (samples.length < 12) {
+            if (samples.length < SAMPLES_NEEDED) {
                 requestAnimationFrame(sample);
                 return;
             }
 
             samples.sort((a, b) => a - b);
             const median = samples[Math.floor(samples.length / 2)];
-            if (median > 0.5) displayRefreshRate = Math.round(1000 / median);
+
+            if (median > 0.5) {
+                const measured = 1000 / median;
+                const snapped = KNOWN_RATES.reduce((best, rate) =>
+                    Math.abs(rate - measured) < Math.abs(best - measured) ? rate : best, KNOWN_RATES[0]);
+
+                // Only accept a snap when it is genuinely close — a 61 Hz measurement should become
+                // 60, but an odd 200 Hz should stay 200 rather than being forced onto 180 or 240.
+                displayRefreshRate = Math.abs(snapped - measured) <= snapped * 0.25
+                    ? snapped
+                    : Math.min(360, Math.max(30, Math.round(measured)));
+            }
 
             // Tell the shell, so the 2x/4x/8x limiter options can be labelled with the rate they
             // actually resolve to (they are multiples of this, not of a hard-coded 60).
@@ -364,6 +520,19 @@ async function boot() {
 
     let lastPumped = 0;
     let fastChannel = null;
+
+    // Drops whatever elapsed while the tab was hidden so the first resumed frame cannot carry the
+    // whole hidden period as one enormous delta. The thread clocks are stopwatch-backed and keep
+    // running regardless, and the framework's clocks have no way to be reset from outside — so this
+    // asks the host to re-base them to their source. Harmless if the host is an older build.
+    const discardHiddenTime = () => {
+        try {
+            pump.ResetTime?.();
+        } catch {
+            // Older framework build without the export: the resume is still correct, just without
+            // the delta clamp.
+        }
+    };
 
     function resolveLimiter(mode) {
         const text = String(mode ?? 'vsync').trim().toLowerCase();
@@ -395,8 +564,19 @@ async function boot() {
     const schedule = (delayMs = 0) => {
         if (wakeHandle) return;
 
+        // The game keeps running while hidden, but on a timer rather than rAF (which stops firing
+        // for a hidden document). It is re-based on the way back to visible — see
+        // discardHiddenTime() — so no single frame ever carries the whole hidden period as one
+        // delta, which is what made returning to the tab stutter.
+        //
+        // A timer rather than nothing also means a pump that starts while the page is already
+        // hidden — a background tab booting — still gets going, instead of waiting on a
+        // visibilitychange event that has already fired.
+        //
+        // 100ms rather than a busy loop: background timers are throttled anyway, and the point
+        // while hidden is to keep the game coherent, not to render.
         if (document.hidden) {
-            wakeHandle = setTimeout(frame, 0);
+            wakeHandle = setTimeout(frame, 100);
             return;
         }
 
@@ -459,9 +639,17 @@ async function boot() {
             clearTimeout(wakeHandle);
             cancelAnimationFrame(wakeHandle);
             wakeHandle = 0;
-            lastPumped = 0;
-            schedule();
         }
+
+        // Unconditional. The previous `if (wakeHandle)` guard wrapped this reset too, so a
+        // visibility flip landing in the middle of pump.Frame() — when wakeHandle is 0 — left
+        // lastPumped stale and the fast limiter resynchronised against a stale origin.
+        lastPumped = 0;
+
+        if (document.hidden) return;
+
+        discardHiddenTime();
+        schedule();
     });
 
     // Debug/verification hooks (frame counter + canvas grab for headless testing).

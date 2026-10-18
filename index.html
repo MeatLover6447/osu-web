@@ -7,34 +7,34 @@
   <!-- Inline so the browser never asks for /favicon.ico (which would be a 404 on any
        static host). An SVG circle in osu!'s pink costs no request and no file. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%23ff66aa'/%3E%3Ccircle cx='50' cy='50' r='26' fill='none' stroke='%23ffffff' stroke-width='7'/%3E%3C/svg%3E">
-  <link href="_framework/dotnet.541iytygra.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-2xPA0xnqevbzG7l2twJPqwCBYK/3C1vP9MQyPNmlOP4=" />
+  <link href="_framework/dotnet.ekzat7xh5a.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-jttpXqNNz+1OxYENneggKelbQBTR56hmdyiysbansd0=" />
   <link rel="stylesheet" href="shell.css" />
   <script type="importmap">{
   "imports": {
-    "./_framework/dotnet.js": "./_framework/dotnet.541iytygra.js",
+    "./_framework/dotnet.js": "./_framework/dotnet.ekzat7xh5a.js",
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.tllim3b3yl.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.azrfhwb804.js",
-    "./main.js": "./main.stcnpjv9oc.js",
+    "./main.js": "./main.5retw5w4eh.js",
     "./osuAudio.js": "./osuAudio.rw0djl3yks.js",
     "./osuGL.js": "./osuGL.4ehm4urlq8.js",
-    "./shell.js": "./shell.8udy8gasxw.js"
+    "./shell.js": "./shell.x0pk7p6we7.js"
   },
   "scopes": {},
   "integrity": {
-    "./_framework/dotnet.541iytygra.js": "sha256-2xPA0xnqevbzG7l2twJPqwCBYK/3C1vP9MQyPNmlOP4=",
-    "./_framework/dotnet.js": "sha256-2xPA0xnqevbzG7l2twJPqwCBYK/3C1vP9MQyPNmlOP4=",
+    "./_framework/dotnet.ekzat7xh5a.js": "sha256-jttpXqNNz+1OxYENneggKelbQBTR56hmdyiysbansd0=",
+    "./_framework/dotnet.js": "sha256-jttpXqNNz+1OxYENneggKelbQBTR56hmdyiysbansd0=",
     "./_framework/dotnet.native.js": "sha256-H5AIX1BCgny8d8HDC8DQO415WAHun8udKf4LRFWAcIk=",
     "./_framework/dotnet.native.tllim3b3yl.js": "sha256-H5AIX1BCgny8d8HDC8DQO415WAHun8udKf4LRFWAcIk=",
     "./_framework/dotnet.runtime.azrfhwb804.js": "sha256-muN076HgyOCoAaid7zD7a2/GN7aQ7tmK/BzdnKgw78g=",
     "./_framework/dotnet.runtime.js": "sha256-muN076HgyOCoAaid7zD7a2/GN7aQ7tmK/BzdnKgw78g=",
-    "./main.js": "sha256-sLW2yiiVGUgqIApQHneVkjqXlFkNzjhZhqcm93G+YYk=",
-    "./main.stcnpjv9oc.js": "sha256-sLW2yiiVGUgqIApQHneVkjqXlFkNzjhZhqcm93G+YYk=",
+    "./main.5retw5w4eh.js": "sha256-8UN7uorW0rkDqUX5yi+cPll8kQgVaAl1unNyeMxh8ds=",
+    "./main.js": "sha256-8UN7uorW0rkDqUX5yi+cPll8kQgVaAl1unNyeMxh8ds=",
     "./osuAudio.js": "sha256-JaNa9SSDn4nUMFM7zgHMPap7DxUaRTuWK8KOlVhl+pg=",
     "./osuAudio.rw0djl3yks.js": "sha256-JaNa9SSDn4nUMFM7zgHMPap7DxUaRTuWK8KOlVhl+pg=",
     "./osuGL.4ehm4urlq8.js": "sha256-jK1hUTpBE/dm/+VifFZ7454Xt2iovtqtYgPdVQ4xNLQ=",
     "./osuGL.js": "sha256-jK1hUTpBE/dm/+VifFZ7454Xt2iovtqtYgPdVQ4xNLQ=",
-    "./shell.8udy8gasxw.js": "sha256-kGLmaA7ztPtnFl4aABp/XEjEtYLWsIwXYN0KKJzuFis=",
-    "./shell.js": "sha256-kGLmaA7ztPtnFl4aABp/XEjEtYLWsIwXYN0KKJzuFis="
+    "./shell.js": "sha256-sYbofYe8cKh/LrJ7RJm+FWtOzUqlWtIXDLpueDrMmTo=",
+    "./shell.x0pk7p6we7.js": "sha256-sYbofYe8cKh/LrJ7RJm+FWtOzUqlWtIXDLpueDrMmTo="
   }
 }</script>
   <!-- The mono runtime boots by firing a burst of fetch() calls for ~1000 wasm/js assets. Every
@@ -61,6 +61,65 @@
       // so they must be regenerated on every rebuild rather than edited by hand.
       const SPLIT_FILES = {"osu.Game.Resources.pikmlvzzc4.wasm":["osu.Game.Resources.pikmlvzzc4.p0.wasm","osu.Game.Resources.pikmlvzzc4.p1.wasm"]};
       const SPLIT_LENGTHS = {"osu.Game.Resources.pikmlvzzc4.wasm":132945177};
+
+      // Boot progress.
+      //
+      // The longest single phase of startup is `dotnet.create()` in main.js, which pulls the whole
+      // WebAssembly payload through this wrapper. On a slow connection that is minutes of silence,
+      // which reads as a hang rather than a download — so count what actually arrives here, where
+      // every _framework response is already visible.
+      //
+      // Bytes are counted as the response body is read rather than from its content-length: the
+      // length of a compressed response describes what crossed the network, while BOOT_TOTAL below
+      // is the size of the payload once decoded. Counting decoded bytes keeps numerator and
+      // denominator in the same units whether or not the host gzips the answer, and reports only
+      // progress the runtime has actually got round to consuming.
+      //
+      // BOOT_TOTAL is the byte total of the root-level assemblies in _framework/ — the payload a
+      // boot really downloads — written by web/make-static-export.ps1. Culture-localised
+      // satellites (fetched only under a non-English UI), the dotnet.*.js entry points (loaded as
+      // <script>, never fetched) and the ICU data files .NET declines to use all ship in the
+      // bundle but are not part of a boot, so counting them would cap the bar short of full. A
+      // plain `dotnet publish` leaves the value 0, meaning "unknown": main.js then reports bytes
+      // and file counts without claiming a percentage it cannot know.
+      const BOOT_TOTAL_BYTES = /*BOOT_TOTAL*/190162279;
+
+      const bootProgress = {
+        bytes: 0,
+        files: 0,
+        failed: 0,
+        inflight: 0,
+        total: BOOT_TOTAL_BYTES,
+      };
+
+      window.__boot = bootProgress;
+
+      // Wrap a body so its bytes are counted as the consumer reads them. A file the runtime never
+      // gets round to reading is therefore never counted either, which is what a progress bar
+      // should say.
+      const countBody = (response) => {
+        if (!response.body || typeof response.body.pipeThrough !== 'function') return response;
+
+        const counter = new TransformStream({
+          transform(chunk, controller) {
+            bootProgress.bytes += chunk.byteLength;
+            controller.enqueue(chunk);
+          },
+          // Fully consumed, so one logical download has arrived.
+          flush() { bootProgress.files++; },
+        });
+
+        return new Response(response.body.pipeThrough(counter), {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        });
+      };
+
+      const noteFrameworkDone = (ok) => {
+        bootProgress.inflight = Math.max(0, bootProgress.inflight - 1);
+        if (!ok) bootProgress.failed++;
+      };
 
       // Two separate problems, one wrapper.
       //
@@ -125,10 +184,16 @@
         const responses = [];
         for (const fragment of fragments) {
           const fragmentUrl = dir + fragment;
-          const response = await fetchWithRetry(fragmentUrl, fragmentInit, fragmentUrl);
-          if (!response.ok)
-            throw new Error(`HTTP ${response.status} for ${fragmentUrl}`);
-          responses.push(response);
+          bootProgress.inflight++;
+          try {
+            const response = await fetchWithRetry(fragmentUrl, fragmentInit, fragmentUrl);
+            if (!response.ok)
+              throw new Error(`HTTP ${response.status} for ${fragmentUrl}`);
+
+            responses.push(response);
+          } finally {
+            bootProgress.inflight = Math.max(0, bootProgress.inflight - 1);
+          }
         }
 
         let seen = 0;
@@ -141,8 +206,13 @@
                   const { done, value } = await reader.read();
                   if (done) break;
                   seen += value.byteLength;
+                  // Counted here rather than in the wrapper: these requests never pass through it,
+                  // and at ~63 MB each the fragments are the bulk of the whole payload. Bytes are
+                  // counted as they are read, so this stays in the same units as BOOT_TOTAL.
+                  bootProgress.bytes += value.byteLength;
                   controller.enqueue(value);
                 }
+                bootProgress.files++;
               }
               if (expected != null && seen !== expected)
                 throw new Error(`assembled ${seen} bytes for ${name}, expected ${expected}`);
@@ -162,22 +232,43 @@
       window.fetch = async (input, init) => {
         const url = String(input && input.url ? input.url : input);
         const hasBody = init && init.body != null;
+        const framework = url.includes('/_framework/') && !hasBody;
 
+        // reassemble() counts its own fragments as they land — that asset is 127 MB of the
+        // payload and by far the slowest part, so it has to be accounted for where it is read.
         if (!hasBody && SPLIT_FILES[url.slice(url.lastIndexOf('/') + 1)])
           return reassemble(url, init);
 
-        const throttled = url.includes('/_framework/') && !hasBody;
-        if (!throttled) return realFetch(input, init);
+        if (!framework) return realFetch(input, init);
 
-        return fetchWithRetry(input, init, url);
+        bootProgress.inflight++;
+        try {
+          const response = await fetchWithRetry(input, init, url);
+          noteFrameworkDone(response.ok);
+          return response.ok ? countBody(response) : response;
+        } catch (e) {
+          noteFrameworkDone(false);
+          throw e;
+        }
       };
     })();
   </script>
-  <script type='module' src="main.stcnpjv9oc.js"></script>
+  <script type='module' src="main.5retw5w4eh.js"></script>
 </head>
 <body>
   <canvas id="game" tabindex="0"></canvas>
-  <div id="status">booting…</div>
+  <!-- Boot progress. A cold load pulls ~130 MB of WebAssembly, which takes long enough to read as
+       a hang, so it gets a full-screen loading bar rather than a status line in the corner.
+       main.js drives the label and the bar (setStatus) and takes the whole thing away once the
+       game reports running. -->
+  <div id="boot">
+    <div class="boot-mark">osu!web</div>
+    <div class="boot-box">
+      <div id="status">booting…</div>
+      <div id="boot-detail"></div>
+      <div class="boot-track"><div id="boot-fill"></div></div>
+    </div>
+  </div>
 
   <!-- The gameplay host draws the playfield here; the shell sits over the top of it and hides
        itself when a play is running (see shell.js). -->
@@ -300,6 +391,6 @@
     </div>
   </div>
 
-  <script type="module" src="shell.8udy8gasxw.js"></script>
+  <script type="module" src="shell.x0pk7p6we7.js"></script>
 </body>
 </html>
