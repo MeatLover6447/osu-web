@@ -1,7 +1,8 @@
 # Cache policy for the static osu!web bundle.
 #
 # The _framework/ directory and the root *.js modules are content-hashed by the .NET SDK
-# (dotnet.541iytygra.js, main.stcnpjv9oc.js, ...), so a given URL always refers to the same
+# (dotnet.<hash>.js, main.<hash>.js, ...), and shell.css is fingerprinted the same way by
+# web/make-static-export.ps1 (shell.<hash>.css), so a given URL always refers to the same
 # bytes and is safe to cache forever. Without this the browser re-downloads ~130 MB of
 # WebAssembly on every page reload.
 #
@@ -10,7 +11,10 @@
 # re-sending the body, so reloading stays fast while a re-uploaded build is still picked up
 # immediately.
 #
-# GitHub Pages ignores this file and applies its own 10-minute default instead.
+# GitHub Pages ignores this file and applies its own 10-minute default instead. That default
+# is exactly why the stylesheet is fingerprinted: an unhashed shell.css can be served from
+# that cache against a freshly deployed index.html for up to ten minutes, which shows up as
+# the previous deploy's styling applied to the new markup.
 
 /*
   Cache-Control: no-cache
@@ -19,4 +23,7 @@
   Cache-Control: public, max-age=31536000, immutable
 
 /*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.css
   Cache-Control: public, max-age=31536000, immutable
