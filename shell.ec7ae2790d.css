@@ -1,0 +1,1131 @@
+/* The HTML shell around the real osu!lazer gameplay host: a lazer-flavoured song-select laid
+   over the beatmap's own background artwork, with the playfield canvas underneath (which the
+   game draws into whenever the shell is hidden).
+
+   Colours follow lazer's OsuColour palette where the shell shows the same things: pink for the
+   primary accent, and the per-ModType colours (blue/red/lime/purple/pink) for the mod picker,
+   which are exactly what OsuColour.ForModType returns upstream. */
+
+:root {
+    /* Backdrop controls. These are written by shell.js from the background dim/blur settings so
+       the menu reads the same way the in-game background does — dimming to the same degree the
+       playfield does makes the transition into gameplay look continuous. */
+    --bg-dim: 0.6;
+    --bg-blur: 6px;
+    --bg-image: none;
+
+    --accent: #ff66aa;
+    --accent-soft: rgba(255, 102, 170, 0.16);
+    --panel: rgba(16, 16, 26, 0.82);
+    --panel-solid: #14141f;
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #e6e6f0;
+    --muted: #9a9ab0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0e0e18;
+    font: 14px/1.5 system-ui, sans-serif;
+    color: var(--text);
+}
+
+#game {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    touch-action: none;
+    outline: none;
+    -webkit-user-select: none;
+    user-select: none;
+    /* The game draws its own cursor from the skin, so the OS pointer over the canvas is a
+       second, wrong-looking cursor. #shell covers the canvas whenever a menu is up, so it
+       keeps a normal pointer and this only applies over gameplay and results. */
+    cursor: none;
+}
+
+/* Boot screen: shown from first paint until the game reports running, then removed by
+   main.js. Deliberately covers the whole viewport — during a cold load the canvas is still
+   black, and a status line in the corner reads as "nothing is happening". */
+#boot {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    background: #08080e;
+}
+
+#boot[hidden] {
+    display: none;
+}
+
+.boot-mark {
+    color: #fff;
+    font: 600 34px/1 'Segoe UI', system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    opacity: 0.92;
+}
+
+.boot-box {
+    width: min(380px, 74vw);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#status {
+    color: #8ab4ff;
+    font: 12px/1.4 'Segoe UI', system-ui, sans-serif;
+    text-align: center;
+    min-height: 1.4em;
+    white-space: pre;
+}
+
+/* Live download detail: bytes, file counts, elapsed. Updated by main.js while the runtime and
+   its assemblies are being fetched — the phase that can take minutes on a slow link. */
+#boot-detail {
+    color: #7a7a90;
+    font: 11px/1.5 'Segoe UI', system-ui, sans-serif;
+    text-align: center;
+    min-height: 1.5em;
+    font-variant-numeric: tabular-nums;
+    white-space: pre;
+}
+
+.boot-track {
+    position: relative;
+    height: 6px;
+    border-radius: 999px;
+    background: #222230;
+    overflow: hidden;
+}
+
+.boot-track::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+    transform: translateX(-100%);
+    animation: load-shimmer 1.1s linear infinite;
+}
+
+#boot-fill {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ff66aa, #ff9ac6);
+    transition: width 320ms ease;
+}
+
+/* --- backdrop ------------------------------------------------------------------------ */
+
+/* The beatmap's own background, dimmed and blurred to whatever the settings ask for. It sits
+   behind the panels the way lazer's background sits behind song select, so the shell reads as
+   the same scene as the playfield it is about to hand over to. */
+#shell-bg {
+    position: absolute;
+    inset: -20px;               /* over-bleed so the blur has no soft edge inside the viewport */
+    background-image: var(--bg-image);
+    background-size: cover;
+    background-position: center;
+    filter: blur(var(--bg-blur)) brightness(calc(1 - var(--bg-dim) * 0.9));
+    transform: scale(1.02);     /* hide the blur bleed at the over-scanned edges */
+    transition: filter 160ms ease;
+}
+
+#shell-bg:not(.has-image) {
+    background: radial-gradient(120% 120% at 30% 20%, #2a1730, #0e0e18 70%);
+    filter: none;
+}
+
+/* --- shell frame --------------------------------------------------------------------- */
+
+#shell {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    /* The canvas stays reachable through the gaps: gameplay input lands on #game, so the shell
+       must not blanket it with pointer events when no menu is meant to be modal. */
+    pointer-events: none;
+}
+
+#shell[hidden] {
+    display: none;
+}
+
+#shell button,
+#shell label,
+#shell aside,
+#shell main,
+#shell .difficulties,
+#shell .column-body {
+    pointer-events: auto;
+}
+
+#shell .muted {
+    color: var(--muted);
+}
+
+#shell .error {
+    color: #ff8080;
+}
+
+/* --- top bar ------------------------------------------------------------------------- */
+
+#topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    pointer-events: auto;
+}
+
+#topbar .topbar-left,
+#topbar .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+#shell-title {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #fff;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+
+#topbar button,
+#shell .import span,
+#settings .import span,
+#settings .settings-box button {
+    padding: 8px 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(24, 24, 36, 0.7);
+    color: var(--text);
+    font: 600 13px/1 system-ui, sans-serif;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: background 120ms ease, transform 80ms ease;
+    white-space: nowrap;
+}
+
+#topbar button:hover:not(:disabled),
+#shell .import:hover span,
+#settings .import:hover span,
+#settings .settings-box button:hover {
+    background: rgba(40, 40, 58, 0.85);
+    transform: translateY(-1px);
+}
+
+#topbar button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* lazer's play button is the one unmistakable pink circle in the corner of song select. */
+#topbar button.play {
+    min-width: 120px;
+    padding: 10px 26px;
+    font-size: 15px;
+    border-color: transparent;
+    background: linear-gradient(180deg, #ff8ec2, var(--accent));
+    color: #2a0a1a;
+    box-shadow: 0 4px 18px rgba(255, 102, 170, 0.35);
+}
+
+#topbar button.play:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffa2cd, #ff74b4);
+}
+
+/* The file pickers are native controls, so the *label* is styled as a button and the input itself
+   is hidden behind it — clicking the visible affordance opens the dialog. This has to cover both
+   places a picker appears: the top bar's .osz import and the settings panel's .osk skin import,
+   which had no button styling at all and so rendered as bare text. */
+#import .import,
+#shell .import,
+#settings .import {
+    position: relative;
+    display: inline-flex;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+#import .import input[type="file"],
+#shell .import input[type="file"],
+#settings .import input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+#import-status,
+#skin-status {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- three-pane layout --------------------------------------------------------------- */
+
+#layout {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    /* Info, then the single difficulty column, then the mods — which take the remaining width
+       because they are the one pane that fans out into a column per category. */
+    grid-template-columns: minmax(220px, 280px) minmax(240px, 320px) minmax(0, 1fr);
+    gap: 16px;
+    padding: 0 16px 16px;
+}
+
+#layout > * {
+    min-height: 0;
+    min-width: 0;
+}
+
+.pane-heading {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* --- left: selected difficulty details ------------------------------------------------ */
+
+#info {
+    align-self: stretch;
+    overflow-y: auto;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+}
+
+#info[hidden] {
+    display: none;
+}
+
+.beatmap-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.beatmap-info-title {
+    margin-bottom: 2px;
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.beatmap-info-sub {
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: #ffb3d3;
+}
+
+.beatmap-info-sub .mapper {
+    color: var(--muted);
+}
+
+/* Stars are the one number that changes with the mod selection, so they get their own line and a
+   colour that tracks the difficulty band — built the same way lazer's StarRatingDisplay is, with
+   the fill gradient behind the number and ForStarDifficultyText on top of it. */
+.beatmap-info-stars {
+    align-self: flex-start;
+    margin: 6px 0 10px;
+    padding: 2px 10px 3px;
+    border-radius: 8px;
+    font-size: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background: var(--star-bg, transparent);
+    color: var(--star-text, #ffd166);
+}
+
+.beatmap-info-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+    font-size: 13px;
+}
+
+.beatmap-info-row .label {
+    color: var(--muted);
+}
+
+.beatmap-info-row .value {
+    color: var(--text);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A value the currently ticked mods actually moved, as opposed to one they left alone. */
+.beatmap-info-row .value.changed {
+    color: #ffd166;
+}
+
+.beatmap-info-objects {
+    display: flex;
+    gap: 14px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.beatmap-info-objects b {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* --- shared: the column layout -------------------------------------------------------- */
+
+/* One panel per category, laid out left to right, the row scrolling horizontally and each panel
+   scrolling its own contents vertically — the shape lazer's mod select gives its categories. */
+.columns {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.columns[hidden] {
+    display: none;
+}
+
+.column {
+    flex: 0 0 clamp(230px, 19vw, 310px);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+}
+
+/* The category name carries its own colour: lazer tints each carousel group panel and each mod
+   select column with the colour of the thing it holds. */
+.column-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--group-colour, var(--muted));
+}
+
+.column-heading .count {
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--muted);
+}
+
+.column-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+/* --- centre: difficulty list ---------------------------------------------------------- */
+
+#list-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#list-pane .empty {
+    align-self: center;
+    margin-top: 8vh;
+    padding: 14px 22px;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+#list-pane .empty[hidden] {
+    display: none;
+}
+
+/* A single column holding every difficulty in the set, easiest first. */
+.difficulties {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.difficulties[hidden] {
+    display: none;
+}
+
+.difficulty {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 100ms ease;
+}
+
+.difficulty:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.difficulty.selected {
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.difficulty .text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.difficulty .name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The band keeps showing even without a column of its own: the mapper line carries it as a small
+   tag, so a difficulty is still identifiable as, say, an Insane at a glance. */
+.difficulty .mapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.difficulty .band {
+    flex: none;
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--band-fill, rgba(0, 0, 0, 0.3));
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--band-text, var(--muted));
+}
+
+.difficulty .mapper-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.difficulty .stars {
+    flex: none;
+    min-width: 58px;
+    padding: 2px 7px;
+    border-radius: 7px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    /* Built the way lazer's StarRatingDisplay is: the star gradient (OsuColour.STAR_DIFFICULTY_
+       SPECTRUM) as the pill behind the number, and ForStarDifficultyText as the number on top.
+       The fill gradient runs to black past 9.0★, which reads as a background and would be
+       invisible as text. */
+    background: var(--star-bg, transparent);
+    color: var(--star-text, #ffd166);
+}
+
+/* --- right: mods ---------------------------------------------------------------------- */
+
+#mods-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+}
+
+/* The columns fill the pane's remaining height so each category scrolls its own mods. */
+#mods-pane .columns {
+    flex: 1;
+    min-height: 0;
+    margin: 0 -6px 10px;
+    padding: 0 6px 6px;
+}
+
+/* A mod is a row, not a chip: lazer writes the full name and description straight onto the panel,
+   alongside the mod's own score multiplier and whether it still scores pp — so nothing has to be
+   hovered to find out what a mod does or what it costs. */
+.mod {
+    margin-bottom: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.mod:hover {
+    border-color: color-mix(in srgb, var(--group-colour, rgba(255, 255, 255, 0.3)) 55%, transparent);
+}
+
+/* Incompatible with something already ticked. Lazer's own mod select treats this as a colour and
+   never a lock — the panel fades toward grey but stays fully hit-testable, because clicking it
+   displaces whatever it collides with rather than being refused. So this dims only; the row keeps
+   its pointer cursor and its hover feedback, and selected outranks it in source order. */
+.mod.incompatible {
+    opacity: 0.42;
+    filter: saturate(0.35);
+}
+
+.mod.incompatible:hover {
+    opacity: 0.78;
+    filter: none;
+}
+
+.mod.selected {
+    border-color: var(--group-colour, var(--accent));
+    background: color-mix(in srgb, var(--group-colour, var(--accent)) 12%, transparent);
+}
+
+.mod-head {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mod-head .acronym {
+    min-width: 34px;
+    padding: 4px 7px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.28);
+    color: #d7d7e6;
+    font: 700 12px/1 ui-monospace, monospace;
+    text-align: center;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.mod.selected .mod-head .acronym {
+    background: var(--group-colour, var(--accent));
+    color: #12060d;
+}
+
+.mod-head .names {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.mod-head .full-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.mod-head .description {
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--muted);
+}
+
+/* Per-mod score multiplier plus its ranked tag, so a mod's own cost is visible without selecting
+   it — the same pair lazer shows in the mod's tooltip. */
+.mod-head .tags {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.mod-head .multiplier {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: #cfcfe0;
+}
+
+.ranked-tag {
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ranked-tag.ranked {
+    background: rgba(136, 218, 32, 0.16);
+    color: #a8ef5c;
+}
+
+.ranked-tag.unranked {
+    background: rgba(242, 36, 43, 0.16);
+    color: #ff8080;
+}
+
+/* A mod with settings gets a gear row that expands them in place, the way lazer's mod
+   customisation panel does. */
+.mod-settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 5px 10px;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.18);
+    color: var(--muted);
+    font: 600 11px/1 system-ui, sans-serif;
+    cursor: pointer;
+}
+
+.mod-settings-toggle:hover {
+    color: var(--text);
+}
+
+.mod-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mod-settings[hidden] {
+    display: none;
+}
+
+.mod-setting {
+    display: grid;
+    grid-template-columns: 1fr minmax(90px, 44%) auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.mod-setting .label {
+    min-width: 0;
+    color: #c8c8d8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mod-setting input[type="range"] {
+    width: 100%;
+    accent-color: var(--group-colour, var(--accent));
+}
+
+.mod-setting select {
+    padding: 3px 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #1b1b28;
+    color: var(--text);
+    font: inherit;
+}
+
+.mod-setting .value {
+    min-width: 46px;
+    text-align: right;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- mod footer: total multiplier, ranked status, and what the mods do to the map -------- */
+
+.mod-footer {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.mod-footer[hidden] {
+    display: none;
+}
+
+.mod-footer-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.mod-multiplier {
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+}
+
+/* The four stats the mods actually move, plus the stars and BPM they produce. Values only fill
+   in once the difficulty calculator has answered for the current selection. */
+.mod-preview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px 10px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    font-size: 11px;
+}
+
+.mod-preview .cell {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.mod-preview .cell .label {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+}
+
+.mod-preview .cell .value {
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.mod-preview .cell .value.changed {
+    color: #ffd166;
+}
+
+#mod-note {
+    margin-top: 8px;
+    min-height: 16px;
+    font-size: 12px;
+}
+
+/* --- results (failed / abandoned run) ------------------------------------------------- */
+
+#results {
+    position: absolute;
+    /* Anchored to the left edge of the first grid column rather than centred on the viewport.
+       Centring put it across the middle of the layout, where it covered the left-hand edge of the
+       mods columns — the exact opposite of where the space is. The first column is
+       minmax(220px, 280px) inside a 16px page gutter, so those numbers bound it here. */
+    left: 16px;
+    bottom: 24px;
+    width: min(280px, calc(100% - 32px));
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel-solid);
+    pointer-events: auto;
+    white-space: pre-wrap;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+}
+
+#results[hidden] {
+    display: none;
+}
+
+/* --- settings modal ------------------------------------------------------------------- */
+
+#settings {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(6, 6, 12, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+#settings[hidden] {
+    display: none;
+}
+
+#settings .settings-box {
+    width: min(720px, 92vw);
+    max-height: 86vh;
+    overflow-y: auto;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--panel-solid);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+    scrollbar-width: thin;
+}
+
+#settings .settings-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+#settings .settings-heading button {
+    padding: 4px 12px;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.settings-section {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+
+.settings-section .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.settings-section .label {
+    min-width: 46px;
+    color: #c8c8d8;
+}
+
+#gameplay-settings .setting {
+    display: grid;
+    grid-template-columns: 1fr minmax(140px, 42%) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 0;
+}
+
+#gameplay-settings .setting .label {
+    color: #c8c8d8;
+}
+
+#gameplay-settings .setting input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+}
+
+#gameplay-settings .setting .value {
+    min-width: 70px;
+    text-align: right;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+#gameplay-settings input[type="checkbox"],
+#settings input[type="checkbox"] {
+    accent-color: var(--accent);
+}
+
+#gameplay-settings select {
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #1b1b28;
+    color: var(--text);
+    font: inherit;
+}
+
+#gameplay-settings .setting-heading {
+    margin: 14px 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+}
+
+/* --- load overlay + floating back ------------------------------------------------------ */
+
+/* Both live outside #shell: during gameplay the shell is hidden, and the results screen is
+   lazer's own canvas content, which the shell must not cover. */
+
+#load-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 8, 14, 0.72);
+    font: 14px/1.5 system-ui, sans-serif;
+    color: var(--text);
+}
+
+#load-overlay[hidden] {
+    display: none;
+}
+
+#load-overlay .load-box {
+    width: min(340px, 78vw);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 18px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel-solid);
+}
+
+#load-overlay .load-track {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    background: #222230;
+    overflow: hidden;
+}
+
+/* Between milestones the true percentage is unknowable, so the track shimmers. A bar frozen at
+   a plausible-looking value reads as broken, which is the exact impression this exists to stop. */
+#load-overlay .load-track::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+    transform: translateX(-100%);
+    animation: load-shimmer 1.1s linear infinite;
+}
+
+@keyframes load-shimmer {
+    to { transform: translateX(100%); }
+}
+
+#load-overlay .load-fill {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ff66aa, #ff9ac6);
+    transition: width 260ms ease;
+}
+
+#game-back {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    z-index: 15;
+    padding: 9px 15px;
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    border-radius: 999px;
+    background: rgba(20, 20, 31, 0.82);
+    color: var(--text);
+    font: 13px/1 system-ui, sans-serif;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+}
+
+#game-back:hover {
+    background: rgba(38, 38, 54, 0.92);
+}
+
+#game-back[hidden] {
+    display: none;
+}
+
+#frame-work {
+    position: fixed;
+    right: 6px;
+    bottom: 42px;
+    z-index: 5;
+    padding: 4px 7px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font: 12px/1.4 monospace;
+    white-space: pre;
+    pointer-events: none;
+}
+
+#frame-work[hidden] { display: none; }
+
+/* --- narrow viewports ------------------------------------------------------------------ */
+
+/* Below the three-pane minimum the side panels stack under the list rather than shrinking to
+   something unreadable. Gameplay itself is untouched: this is only the shell's layout. */
+@media (max-width: 900px) {
+    #layout {
+        grid-template-columns: 1fr;
+        grid-auto-rows: minmax(0, auto);
+        overflow-y: auto;
+    }
+
+    #layout > #list-pane {
+        order: -1;
+        max-height: 40vh;
+    }
+
+    #info,
+    #mods-pane {
+        max-height: 40vh;
+    }
+}

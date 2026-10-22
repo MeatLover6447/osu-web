@@ -1093,6 +1093,21 @@ html, body {
     display: none;
 }
 
+#frame-work {
+    position: fixed;
+    right: 6px;
+    bottom: 42px;
+    z-index: 5;
+    padding: 4px 7px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font: 12px/1.4 monospace;
+    white-space: pre;
+    pointer-events: none;
+}
+
+#frame-work[hidden] { display: none; }
+
 /* --- narrow viewports ------------------------------------------------------------------ */
 
 /* Below the three-pane minimum the side panels stack under the list rather than shrinking to
