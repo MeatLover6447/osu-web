@@ -7,13 +7,13 @@
   <!-- Inline so the browser never asks for /favicon.ico (which would be a 404 on any
        static host). An SVG circle in osu!'s pink costs no request and no file. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%23ff66aa'/%3E%3Ccircle cx='50' cy='50' r='26' fill='none' stroke='%23ffffff' stroke-width='7'/%3E%3C/svg%3E">
-  <link href="_framework/dotnet.teu9ha4kuo.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-NVu8Pdm5494h0F4xuwNW+K8VCRqc0xe4Qy7/bD2hjvU=" />
+  <link href="_framework/dotnet.uz4e5uwfd9.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-NtKtkY5yhbzn36WnCL2f+VPdrfJKVdIjx2naXKdhMVE=" />
   <link rel="stylesheet" href="shell.ec2f58d213.css" />
   <script type="importmap">{
   "imports": {
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.ab7cvdvoxj.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.azrfhwb804.js",
-    "./_framework/dotnet.js": "./_framework/dotnet.teu9ha4kuo.js",
+    "./_framework/dotnet.js": "./_framework/dotnet.uz4e5uwfd9.js",
     "./main.js": "./main.5retw5w4eh.js",
     "./osuAudio.js": "./osuAudio.rw0djl3yks.js",
     "./osuGL.js": "./osuGL.4ehm4urlq8.js",
@@ -21,12 +21,12 @@
   },
   "scopes": {},
   "integrity": {
-    "./_framework/dotnet.js": "sha256-NVu8Pdm5494h0F4xuwNW+K8VCRqc0xe4Qy7/bD2hjvU=",
+    "./_framework/dotnet.js": "sha256-NtKtkY5yhbzn36WnCL2f+VPdrfJKVdIjx2naXKdhMVE=",
     "./_framework/dotnet.native.ab7cvdvoxj.js": "sha256-BnNj4Rbc4ed/rLgPeyL0WduIU/YTZ/I2NavvBBowY4M=",
     "./_framework/dotnet.native.js": "sha256-BnNj4Rbc4ed/rLgPeyL0WduIU/YTZ/I2NavvBBowY4M=",
     "./_framework/dotnet.runtime.azrfhwb804.js": "sha256-muN076HgyOCoAaid7zD7a2/GN7aQ7tmK/BzdnKgw78g=",
     "./_framework/dotnet.runtime.js": "sha256-muN076HgyOCoAaid7zD7a2/GN7aQ7tmK/BzdnKgw78g=",
-    "./_framework/dotnet.teu9ha4kuo.js": "sha256-NVu8Pdm5494h0F4xuwNW+K8VCRqc0xe4Qy7/bD2hjvU=",
+    "./_framework/dotnet.uz4e5uwfd9.js": "sha256-NtKtkY5yhbzn36WnCL2f+VPdrfJKVdIjx2naXKdhMVE=",
     "./main.5retw5w4eh.js": "sha256-8UN7uorW0rkDqUX5yi+cPll8kQgVaAl1unNyeMxh8ds=",
     "./main.js": "sha256-8UN7uorW0rkDqUX5yi+cPll8kQgVaAl1unNyeMxh8ds=",
     "./osuAudio.js": "sha256-JaNa9SSDn4nUMFM7zgHMPap7DxUaRTuWK8KOlVhl+pg=",
@@ -82,7 +82,7 @@
       // bundle but are not part of a boot, so counting them would cap the bar short of full. A
       // plain `dotnet publish` leaves the value 0, meaning "unknown": main.js then reports bytes
       // and file counts without claiming a percentage it cannot know.
-      const BOOT_TOTAL_BYTES = /*BOOT_TOTAL*/246955860;
+      const BOOT_TOTAL_BYTES = /*BOOT_TOTAL*/246955889;
 
       const bootProgress = {
         bytes: 0,
