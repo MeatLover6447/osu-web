@@ -7,34 +7,34 @@
   <!-- Inline so the browser never asks for /favicon.ico (which would be a 404 on any
        static host). An SVG circle in osu!'s pink costs no request and no file. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%23ff66aa'/%3E%3Ccircle cx='50' cy='50' r='26' fill='none' stroke='%23ffffff' stroke-width='7'/%3E%3C/svg%3E">
-  <link href="_framework/dotnet.uz4e5uwfd9.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-NtKtkY5yhbzn36WnCL2f+VPdrfJKVdIjx2naXKdhMVE=" />
+  <link href="_framework/dotnet.nag79ta6y0.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-wVQBwbMxKl/Ys3BjRQRhznbRocGrQNoo6KSJ+uBY1l0=" />
   <link rel="stylesheet" href="shell.ec2f58d213.css" />
   <script type="importmap">{
   "imports": {
+    "./_framework/dotnet.js": "./_framework/dotnet.nag79ta6y0.js",
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.ab7cvdvoxj.js",
     "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.azrfhwb804.js",
-    "./_framework/dotnet.js": "./_framework/dotnet.uz4e5uwfd9.js",
-    "./main.js": "./main.5retw5w4eh.js",
+    "./main.js": "./main.ipfyo8ea01.js",
     "./osuAudio.js": "./osuAudio.rw0djl3yks.js",
     "./osuGL.js": "./osuGL.4ehm4urlq8.js",
-    "./shell.js": "./shell.x0pk7p6we7.js"
+    "./shell.js": "./shell.9pci8u0q04.js"
   },
   "scopes": {},
   "integrity": {
-    "./_framework/dotnet.js": "sha256-NtKtkY5yhbzn36WnCL2f+VPdrfJKVdIjx2naXKdhMVE=",
+    "./_framework/dotnet.js": "sha256-wVQBwbMxKl/Ys3BjRQRhznbRocGrQNoo6KSJ+uBY1l0=",
+    "./_framework/dotnet.nag79ta6y0.js": "sha256-wVQBwbMxKl/Ys3BjRQRhznbRocGrQNoo6KSJ+uBY1l0=",
     "./_framework/dotnet.native.ab7cvdvoxj.js": "sha256-BnNj4Rbc4ed/rLgPeyL0WduIU/YTZ/I2NavvBBowY4M=",
     "./_framework/dotnet.native.js": "sha256-BnNj4Rbc4ed/rLgPeyL0WduIU/YTZ/I2NavvBBowY4M=",
     "./_framework/dotnet.runtime.azrfhwb804.js": "sha256-muN076HgyOCoAaid7zD7a2/GN7aQ7tmK/BzdnKgw78g=",
     "./_framework/dotnet.runtime.js": "sha256-muN076HgyOCoAaid7zD7a2/GN7aQ7tmK/BzdnKgw78g=",
-    "./_framework/dotnet.uz4e5uwfd9.js": "sha256-NtKtkY5yhbzn36WnCL2f+VPdrfJKVdIjx2naXKdhMVE=",
-    "./main.5retw5w4eh.js": "sha256-8UN7uorW0rkDqUX5yi+cPll8kQgVaAl1unNyeMxh8ds=",
-    "./main.js": "sha256-8UN7uorW0rkDqUX5yi+cPll8kQgVaAl1unNyeMxh8ds=",
+    "./main.ipfyo8ea01.js": "sha256-+uPlTaPtFv24U8MOtvDC1oP2WRok84ABaeHNeMP85UY=",
+    "./main.js": "sha256-+uPlTaPtFv24U8MOtvDC1oP2WRok84ABaeHNeMP85UY=",
     "./osuAudio.js": "sha256-JaNa9SSDn4nUMFM7zgHMPap7DxUaRTuWK8KOlVhl+pg=",
     "./osuAudio.rw0djl3yks.js": "sha256-JaNa9SSDn4nUMFM7zgHMPap7DxUaRTuWK8KOlVhl+pg=",
     "./osuGL.4ehm4urlq8.js": "sha256-jK1hUTpBE/dm/+VifFZ7454Xt2iovtqtYgPdVQ4xNLQ=",
     "./osuGL.js": "sha256-jK1hUTpBE/dm/+VifFZ7454Xt2iovtqtYgPdVQ4xNLQ=",
-    "./shell.js": "sha256-sYbofYe8cKh/LrJ7RJm+FWtOzUqlWtIXDLpueDrMmTo=",
-    "./shell.x0pk7p6we7.js": "sha256-sYbofYe8cKh/LrJ7RJm+FWtOzUqlWtIXDLpueDrMmTo="
+    "./shell.9pci8u0q04.js": "sha256-My80tbh8/amJyxTL8ne4Ak1j3uxVjeyfQuE0oJNJTqI=",
+    "./shell.js": "sha256-My80tbh8/amJyxTL8ne4Ak1j3uxVjeyfQuE0oJNJTqI="
   }
 }</script>
   <!-- The mono runtime boots by firing a burst of fetch() calls for ~1000 wasm/js assets. Every
@@ -59,8 +59,8 @@
       //
       // Both tables are rewritten by web/make-static-export.ps1. The name carries a content hash,
       // so they must be regenerated on every rebuild rather than edited by hand.
-      const SPLIT_FILES = {"osu.Game.Resources.l0e37vh9fn.wasm":["osu.Game.Resources.l0e37vh9fn.p0.wasm","osu.Game.Resources.l0e37vh9fn.p1.wasm"]};
-      const SPLIT_LENGTHS = {"osu.Game.Resources.l0e37vh9fn.wasm":110423833};
+      const SPLIT_FILES = {"osu.Game.Resources.l0e37vh9fn.wasm":["osu.Game.Resources.l0e37vh9fn.4089772.p0.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p1.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p2.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p3.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p4.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p5.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p6.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p7.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p8.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p9.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p10.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p11.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p12.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p13.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p14.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p15.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p16.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p17.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p18.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p19.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p20.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p21.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p22.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p23.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p24.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p25.wasm","osu.Game.Resources.l0e37vh9fn.4089772.p26.wasm"],"dotnet.native.zfapctn89w.wasm":["dotnet.native.zfapctn89w.4062498.p0.wasm","dotnet.native.zfapctn89w.4062498.p1.wasm","dotnet.native.zfapctn89w.4062498.p2.wasm","dotnet.native.zfapctn89w.4062498.p3.wasm","dotnet.native.zfapctn89w.4062498.p4.wasm","dotnet.native.zfapctn89w.4062498.p5.wasm","dotnet.native.zfapctn89w.4062498.p6.wasm","dotnet.native.zfapctn89w.4062498.p7.wasm","dotnet.native.zfapctn89w.4062498.p8.wasm","dotnet.native.zfapctn89w.4062498.p9.wasm","dotnet.native.zfapctn89w.4062498.p10.wasm","dotnet.native.zfapctn89w.4062498.p11.wasm","dotnet.native.zfapctn89w.4062498.p12.wasm","dotnet.native.zfapctn89w.4062498.p13.wasm","dotnet.native.zfapctn89w.4062498.p14.wasm","dotnet.native.zfapctn89w.4062498.p15.wasm","dotnet.native.zfapctn89w.4062498.p16.wasm","dotnet.native.zfapctn89w.4062498.p17.wasm","dotnet.native.zfapctn89w.4062498.p18.wasm","dotnet.native.zfapctn89w.4062498.p19.wasm","dotnet.native.zfapctn89w.4062498.p20.wasm","dotnet.native.zfapctn89w.4062498.p21.wasm","dotnet.native.zfapctn89w.4062498.p22.wasm","dotnet.native.zfapctn89w.4062498.p23.wasm"],"osu.Game.jwd7yv0uwl.wasm":["osu.Game.jwd7yv0uwl.3477389.p0.wasm","osu.Game.jwd7yv0uwl.3477389.p1.wasm"]};
+      const SPLIT_LENGTHS = {"osu.Game.Resources.l0e37vh9fn.wasm":110423833,"dotnet.native.zfapctn89w.wasm":97499938,"osu.Game.jwd7yv0uwl.wasm":6954777};
 
       // Boot progress.
       //
@@ -253,7 +253,7 @@
       };
     })();
   </script>
-  <script type='module' src="main.5retw5w4eh.js"></script>
+  <script type='module' src="main.ipfyo8ea01.js"></script>
 </head>
 <body>
   <canvas id="game" tabindex="0"></canvas>
@@ -391,6 +391,6 @@
     </div>
   </div>
 
-  <script type="module" src="shell.x0pk7p6we7.js"></script>
+  <script type="module" src="shell.9pci8u0q04.js"></script>
 </body>
 </html>
