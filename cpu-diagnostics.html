@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>osu! CPU diagnostics</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#111;color:#fff;font:14px system-ui,sans-serif}
+#app{position:fixed;inset:0;width:100%;height:100%;border:0}
+#tools{position:fixed;bottom:6px;right:6px;z-index:10;background:#151515ed;padding:8px;border:1px solid #777;border-radius:5px;max-width:min(560px,94vw)}
+button,a{font:inherit}button{margin:2px;padding:6px 8px;cursor:pointer}summary{cursor:pointer;margin:4px}#status{margin:5px 2px;font-size:12px;color:#ccc}details p{max-width:510px;line-height:1.4;margin:8px 3px}
+dialog{background:#151515;color:white;border:1px solid #aaa;max-width:94vw;max-height:94vh;padding:12px}dialog::backdrop{background:#000b}#shot{max-width:88vw;max-height:70vh;display:block;margin-top:10px}pre{white-space:pre-wrap;font:12px monospace}#shot[hidden]{display:none}a{color:#9dd7ff}
+</style>
+</head>
+<body>
+<iframe id="app" title="osu! restored baseline" allow="autoplay; fullscreen"></iframe>
+<section id="tools" aria-label="Diagnostics controls">
+<div><button id="stats" type="button">CPU stats on / off</button><button id="frames" type="button">Cycle frame graph</button><button id="read" type="button">Read timings</button><button id="capture" type="button">Capture game</button></div>
+<details><summary>How to collect a useful sample</summary><p>Start the same map with Autoplay. Use native resolution and vsync. These controls move focus away from the game, so use Autoplay to avoid pausing. Enable show FPS in settings, then read timings before opening CPU stats.</p><p>CPU stats opens lazer's existing Ctrl+F2 window. Move the pointer inside that window and scroll down to <strong>Update (Top CPU consumers)</strong>. Capture those five rows, then scroll to the Draw and Update counters for another capture.</p><p>This profiler adds CPU work and drawables. Its ranking identifies costly types; its FPS is not a normal-play benchmark. Close CPU stats after collecting the samples. Cycle frame graph sends Ctrl+F11; click again to cycle back off.</p><p>The game keeps the full browser viewport. Captures stay on this device. This page uses the existing build and does not change gameplay code or saved settings.</p></details>
+<div id="status" role="status">Loading the restored build…</div>
+</section>
+<dialog id="snapshot"><form method="dialog"><button>Close and return to game</button> <a id="download" download="osu-diagnostics.png" hidden>Save PNG</a></form><img id="shot" alt="Captured osu! game and built-in diagnostics" hidden><pre id="readout"></pre></dialog>
+<script>
+'use strict';
+const app = document.getElementById('app');
+const status = document.getElementById('status');
+const snapshot = document.getElementById('snapshot');
+const readout = document.getElementById('readout');
+const shot = document.getElementById('shot');
+const download = document.getElementById('download');
+let imageUrl = null;
+let capturePending = false;
+const parseReturn = fn => { try { return JSON.parse(fn()); } catch (error) { return { error: String(error) }; } };
+function gameWindow() {
+    const win = app.contentWindow;
+    if (!win?.osu || !win.__osuweb) throw new Error('Wait until osu! finishes loading.');
+    return win;
+}
+function focusGame(win) {
+    win.document.activeElement?.blur();
+    win.focus();
+    win.document.getElementById('game')?.focus();
+}
+function shortcut(code) {
+    const win = gameWindow();
+    focusGame(win);
+    const send = (type, keyCode, ctrlKey) => win.dispatchEvent(new win.KeyboardEvent(type, {
+        code: keyCode, key: keyCode === 'ControlLeft' ? 'Control' : keyCode,
+        ctrlKey, bubbles: true, cancelable: true
+    }));
+    try {
+        send('keydown', 'ControlLeft', true);
+        send('keydown', code, true);
+    } finally {
+        send('keyup', code, true);
+        send('keyup', 'ControlLeft', false);
+    }
+    status.textContent = code === 'F2' ? 'CPU stats toggled. Scroll its window to Update (Top CPU consumers).' : 'Frame statistics cycled (minimal → full → off).';
+}
+function collect(win) {
+    return {
+        page: location.href,
+        capturedAt: new Date().toISOString(),
+        viewport: `${win.innerWidth}x${win.innerHeight}`,
+        performance: parseReturn(() => win.osu.getPerformance()),
+        state: parseReturn(() => win.osu.getGameState()),
+        note: 'Type profiling and its UI add CPU work. Compare normal-play timings with CPU stats closed.'
+    };
+}
+function showReadings(win, image) {
+    readout.textContent = JSON.stringify(collect(win), null, 2);
+    shot.hidden = !image;
+    download.hidden = !image;
+    snapshot.showModal();
+}
+function readTimings() {
+    const win = gameWindow();
+    showReadings(win, false);
+}
+function capture() {
+    if (capturePending) return;
+    const win = gameWindow();
+    const canvas = win.document.getElementById('game');
+    if (!canvas?.width || !canvas?.height) throw new Error('Game canvas is not ready.');
+    focusGame(win);
+    capturePending = true;
+    status.textContent = 'Capturing the next displayed frame…';
+    // Registered after the game's pending vsync callback, before the backbuffer is discarded.
+    win.requestAnimationFrame(() => {
+        try {
+            const copy = document.createElement('canvas');
+            copy.width = canvas.width;
+            copy.height = canvas.height;
+            copy.getContext('2d').drawImage(canvas, 0, 0);
+            copy.toBlob(blob => {
+                capturePending = false;
+                if (!blob) { status.textContent = 'Capture failed. Try again with vsync selected.'; return; }
+                if (imageUrl) URL.revokeObjectURL(imageUrl);
+                imageUrl = URL.createObjectURL(blob);
+                shot.src = download.href = imageUrl;
+                showReadings(win, true);
+                status.textContent = 'Full-resolution capture is ready to save.';
+            }, 'image/png');
+        } catch (error) {
+            capturePending = false;
+            status.textContent = String(error);
+        }
+    });
+}
+function run(action) { try { action(); } catch (error) { status.textContent = String(error); } }
+document.getElementById('stats').addEventListener('click', () => run(() => shortcut('F2')));
+document.getElementById('frames').addEventListener('click', () => run(() => shortcut('F11')));
+document.getElementById('read').addEventListener('click', () => run(readTimings));
+document.getElementById('capture').addEventListener('click', () => run(capture));
+snapshot.addEventListener('close', () => run(() => focusGame(gameWindow())));
+app.addEventListener('load', () => { status.textContent = 'Finish loading, then start the map inside the game. CPU stats remain off until clicked.'; });
+Object.defineProperty(window, 'osu', { get: () => app.contentWindow?.osu });
+const gameUrl = new URL('./', location.href);
+gameUrl.search = '?diagnostics=baseline-ac4379b';
+app.src = gameUrl.href;
+</script>
+</body>
+</html>
